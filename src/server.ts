@@ -66,10 +66,10 @@ function transferPaymentListToWebServer() {
             write(paymentsFilename, paymentsString).then(() => {
                 scpToWebServer(paymentsFilename).then(() => {
                     console.log("transfer done.");
-                    process.exit(0);
+                    // process.exit(0);
                 }).catch((err) => {
                     console.log("scp error:" + err);
-                    process.exit(-1);
+                    // process.exit(-1);
                 });
             }).catch((error)=>{
                 console.log("write error:"+error);
