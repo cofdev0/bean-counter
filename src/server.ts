@@ -2,6 +2,7 @@ import { BunqKey, BunqApi, BunqApiConfig, BunqApiSetup, BunqConnection, BunqServ
 const write = require('fs-writefile-promise');
 const client = require('scp2');
 const restify = require('restify');
+const moment = require('moment');
 
 const config:BunqApiConfig = new BunqApiConfig();
 const secretConfig:BunqApiConfig=new BunqApiConfig(config.json.secretsFile);
@@ -28,13 +29,15 @@ const https_server = restify.createServer(https_options);
 
 const setup_server = function(server) {
     function getRespond(req, res) {
-        console.log("get callback received: "+req);
+        let now:string = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+        console.log("get callback received: "+now+" "+req);
         // res.send('Your get callback was received!');
     }
 
     function postRespond(req, res) {
-        console.log("post callback received: "+req);
-        // res.send('Your post callback was received!');
+        let now:string = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+        console.log("post callback received "+now);
+        res.send('ok');
         transferPaymentListToWebServer();
     }
 
@@ -116,8 +119,9 @@ function requestPaymentsFromBunq():Promise<any> {
 }
 
 function scpToWebServer(filename:string):Promise<any> {
-    let config = secretConfig.json.webServerSecrets;
-    config.path=secretConfig.json.webServerSecrets.path+filename;
+    let pathToFile:string = secretConfig.json.webServerSecrets.path+filename;
+    let config = JSON.parse(JSON.stringify(secretConfig.json.webServerSecrets));
+    config.path=pathToFile;
     return new Promise(function(resolve, reject) {
         client.scp(filename, config, (err) => {err === null ? resolve(filename) : reject(err)});
     });
