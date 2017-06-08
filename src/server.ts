@@ -60,6 +60,7 @@ const setup_server = function(server) {
 
 };
 
+transferPaymentListToWebServer();
 startCallbackServer();
 
 function startCallbackServer() {
@@ -70,7 +71,6 @@ function startCallbackServer() {
     });
 }
 
-transferPaymentListToWebServer();
 
 function transferPaymentListToWebServer() {
     requestPaymentsFromBunq().then((payments) => {
