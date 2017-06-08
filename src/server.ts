@@ -1,6 +1,7 @@
 import { BunqKey, BunqApi, BunqApiConfig, BunqApiSetup, BunqConnection, BunqServerConnection, SessionCreator } from 'bunq-api/dist/index';
 const write = require('fs-writefile-promise');
-const client = require('scp2');
+const scp2 = require('scp2');
+const ClientSsh2 = require('ssh-promise');
 const restify = require('restify');
 const moment = require('moment');
 
@@ -18,7 +19,17 @@ const bunqApi:BunqApi=new BunqApi(connect, key,secretConfig.json.secret,setup,
 // for verification that callback is from bunq server
 bunqApi.setPubBunqKeyPem(installationTokenConfig.Response[2].ServerPublicKey.server_public_key);
 
-const paymentsFilename:string="payments.json";
+const localPaymentsFilename:string="payments.json";
+
+// secretConfig.json.webServerSecrets should look something like:
+// "webServerSecrets" : {
+//     "host" : "some.server.com",
+//         "port" : 22,
+//         "user" : "username",
+//         "password": "password",
+//         "path":"/path/to/temp/filename/payments_temp.json",
+//         "pathPayments":"/path/to/final/filename/payments.json"
+// }
 
 const https_options = {
     key: BunqApiConfig.read(secretConfig.json.notificationKeyFile),
@@ -59,16 +70,31 @@ function startCallbackServer() {
     });
 }
 
-//transferPaymentListToWebServer();
+transferPaymentListToWebServer();
 
 function transferPaymentListToWebServer() {
     requestPaymentsFromBunq().then((payments) => {
         requestAccountBalanceFromBunq().then((balance)=>{
             payments.sum=balance;
             let paymentsString:string = JSON.stringify(payments);
-            write(paymentsFilename, paymentsString).then(() => {
-                scpToWebServer(paymentsFilename).then(() => {
+            write(localPaymentsFilename, paymentsString).then(() => {
+                scpToWebServer(localPaymentsFilename).then(() => {
                     console.log("transfer done.");
+                    const ssh = new ClientSsh2(secretConfig.json.webServerSecrets);
+                    ssh.exec('rm -f '+secretConfig.json.webServerSecrets.pathPayments).then(()=>{
+                        let moveCmd = 'mv '+secretConfig.json.webServerSecrets.path
+                            +' '+secretConfig.json.webServerSecrets.pathPayments;
+                        ssh.exec(moveCmd).then(()=>{
+                            console.log("rename done.");
+                            // process.exit(-1);
+                        }).catch((err) => {
+                            console.log("ssh mv error:" + err);
+                            // process.exit(-1);
+                        });
+                    }).catch((err) => {
+                        console.log("ssh rm error:" + err);
+                        // process.exit(-1);
+                    });
                     // process.exit(0);
                 }).catch((err) => {
                     console.log("scp error:" + err);
@@ -118,19 +144,21 @@ function requestPaymentsFromBunq():Promise<any> {
     });
 }
 
-function scpToWebServer(filename:string):Promise<any> {
-    let pathToFile:string = secretConfig.json.webServerSecrets.path+filename;
-    let config = JSON.parse(JSON.stringify(secretConfig.json.webServerSecrets));
-    config.path=pathToFile;
-    return new Promise(function(resolve, reject) {
-        client.scp(filename, config, (err) => {err === null ? resolve(filename) : reject(err)});
-    });
-}
-
 class Payment {
     value:string;
     iban:string;
     description:string;
     created:string;
 }
+
+function scpToWebServer(filename:string):Promise<any> {
+    // let pathToFile:string = secretConfig.json.webServerSecrets.path+filename;
+    // let config = JSON.parse(JSON.stringify(secretConfig.json.webServerSecrets));
+    // config.path=pathToFile;
+    return new Promise(function(resolve, reject) {
+        scp2.scp(filename, secretConfig.json.webServerSecrets
+            , (err) => {err === null ? resolve(filename) : reject(err)});
+    });
+}
+
 
