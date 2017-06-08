@@ -23,13 +23,14 @@ const localPaymentsFilename:string="payments.json";
 
 // secretConfig.json.webServerSecrets should look something like:
 // "webServerSecrets" : {
-//     "host" : "some.server.com",
+//         "host" : "some.server.com",
 //         "port" : 22,
 //         "user" : "username",
 //         "password": "password",
 //         "path":"/path/to/temp/filename/payments_temp.json",
 //         "pathPayments":"/path/to/final/filename/payments.json"
 // }
+
 
 const https_options = {
     key: BunqApiConfig.read(secretConfig.json.notificationKeyFile),
@@ -60,7 +61,6 @@ const setup_server = function(server) {
 
 };
 
-transferPaymentListToWebServer();
 startCallbackServer();
 
 function startCallbackServer() {
@@ -71,6 +71,8 @@ function startCallbackServer() {
     });
 }
 
+transferPaymentListToWebServer();
+
 
 function transferPaymentListToWebServer() {
     requestPaymentsFromBunq().then((payments) => {
@@ -80,7 +82,7 @@ function transferPaymentListToWebServer() {
             write(localPaymentsFilename, paymentsString).then(() => {
                 scpToWebServer(localPaymentsFilename).then(() => {
                     console.log("transfer done.");
-                    const ssh = new ClientSsh2(secretConfig.json.webServerSecrets);
+                    const ssh = new ClientSsh2(secretConfig.json.webServerSecrets,ssh2Logger);
                     ssh.exec('rm -f '+secretConfig.json.webServerSecrets.pathPayments).then(()=>{
                         let moveCmd = 'mv '+secretConfig.json.webServerSecrets.path
                             +' '+secretConfig.json.webServerSecrets.pathPayments;
@@ -110,6 +112,15 @@ function transferPaymentListToWebServer() {
         console.log("bunq reqPayment error"+error);
     });
 }
+
+const ssh2Logger = {
+    info:(msg)=>{
+        //console.log(msg);
+    },
+    error:(msg)=>{
+        console.log(msg);
+    }
+};
 
 
 function requestAccountBalanceFromBunq():Promise<any> {
